@@ -6,6 +6,8 @@ A robust tool to scan prompts for potentially unsafe content using LLM-based gua
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Test Coverage: 100%](https://img.shields.io/badge/Test%20Coverage-100%25-brightgreen.svg)](https://github.com/shivama205/prompt-scanner)
 
+**Current Version: 0.2.0** - Now with 100% test coverage and improved validation!
+
 ## Overview
 
 Prompt Scanner analyzes input text against content safety policies to detect potentially unsafe or harmful content. It uses Large Language Models (LLMs) as content judges to provide more context-aware and nuanced content safety evaluations than simple pattern matching.
@@ -23,12 +25,23 @@ The package is designed to be easy to integrate into your AI applications, helpi
 - **Customizable**: Supports customizing the LLM model used for evaluation
 - **Custom Guardrails**: Add your own custom guardrails and content policy categories
 
+## What's New in 0.2.0
+
+- **100% Test Coverage**: All modules now have complete test coverage
+- **Improved Validation**: Better handling of different message formats
+- **Enhanced Error Handling**: More robust error handling in scanner classes
+- **See the [CHANGELOG.md](CHANGELOG.md) for full details**
+
 ## Quick Start
 
 ### Installation
 
 ```bash
+# Install the latest version
 pip install prompt-scanner
+
+# Or specify the version explicitly
+pip install prompt-scanner==0.2.0
 ```
 
 ### Basic Usage
