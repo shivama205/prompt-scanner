@@ -132,4 +132,7 @@ Thumbs.db
 *.pkl
 api_keys.json
 secrets.json
-credentials.json 
+credentials.json
+
+# PyPI config with API tokens
+.pypirc 

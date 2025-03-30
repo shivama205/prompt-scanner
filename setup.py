@@ -18,9 +18,9 @@ setup(
     description="A tool to scan prompts for potentially unsafe content using LLM-based guardrails",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="Your Name",
-    author_email="your.email@example.com",
-    url="https://github.com/yourusername/prompt-scanner",
+    author="Shivam Aggarwal",
+    author_email="shivama205@gmail.com",
+    url="https://github.com/shivama205/prompt-scanner",
     packages=find_packages(),
     package_data={
         "prompt_scanner": ["data/*.yaml"],
