@@ -4,7 +4,7 @@ A robust tool to scan prompts for potentially unsafe content using LLM-based gua
 
 [![PyPI version](https://badge.fury.io/py/prompt-scanner.svg)](https://badge.fury.io/py/prompt-scanner)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Test Coverage: 100%](https://img.shields.io/badge/Test%20Coverage-100%25-brightgreen.svg)](https://github.com/shivama205/prompt-scanner)
+[![Test Coverage: 90%](https://img.shields.io/badge/Test%20Coverage-90+%25-brightgreen.svg)](https://github.com/shivama205/prompt-scanner)
 
 **Current Version: 0.3.1** - Now with enhanced severity levels for better risk assessment!
 
@@ -183,7 +183,7 @@ bash examples/run_without_installation.sh
 ## Quality
 
 This package is built with quality in mind:
-- 100% test coverage with thorough unit and integration tests
+- 90% test coverage with thorough unit and integration tests
 - Well-documented API with detailed examples
 - Comprehensive error handling and validation
 - Support for multiple LLM providers
