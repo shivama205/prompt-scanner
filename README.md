@@ -141,47 +141,53 @@ top_risks = result.get_highest_risk_categories(max_count=2)
 
 ### Using Decorators for Automated Scanning
 
-Prompt Scanner provides decorators to automatically scan inputs and outputs:
+For automated scanning of inputs and outputs, you can use decorators provided through the `PromptScanner` instance:
 
 ```python
-from prompt_scanner import scan_prompt, safe_completion
+from prompt_scanner import PromptScanner
 from openai import OpenAI
 
+# Initialize scanner once
+scanner = PromptScanner(provider="openai")
 client = OpenAI()
 
 # Decorator that scans prompts before processing
-@scan_prompt(provider="openai", raise_on_unsafe=True)
-def generate_content(prompt):
+@scanner.decorators.scan(prompt_param="user_input")
+def generate_content(user_input):
+    # This function will only run if the content is safe
+    # If unsafe, the decorator returns the PromptScanResult directly
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": user_input}
         ]
     )
     return response.choices[0].message.content
 
-# Decorator that scans both input and output
-@safe_completion(
-    provider="openai", 
-    fallback_response="I cannot provide that information."
-)
+# Usage example
+result = generate_content(user_input="Tell me about space")
+
+# Check if result is a PromptScanResult (unsafe) or a string (safe)
+if hasattr(result, 'is_safe'):
+    print(f"Content was unsafe: {result.category.name}")
+    print(f"Reasoning: {result.reasoning}")
+else:
+    print(f"Response: {result}")
+
+# You can also scan both input and output with safe_completion
+@scanner.decorators.safe_completion(prompt_param="question")
 def answer_question(question):
+    # If input is unsafe, returns PromptScanResult
+    # If output is unsafe, returns PromptScanResult
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": question}]
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": question}
+        ]
     )
     return response.choices[0].message.content
-
-# Use the decorated functions
-try:
-    # This will raise an error if the prompt is unsafe
-    result = generate_content("Tell me about space exploration")
-    
-    # This will return a fallback response if input or output is unsafe
-    answer = answer_question("What is quantum computing?")
-except ValueError as e:
-    print(f"Safety check failed: {e}")
 ```
 
 ### Prompt Structure Validation
@@ -277,6 +283,9 @@ class MyCustomScanner(BasePromptScanner):
 ### Classes
 
 - `PromptScanner`: Main class for scanning prompts and text content
+  - `decorators`: Accessor for decorator functions:
+    - `scanner.decorators.scan()`: Decorator that scans prompts before processing
+    - `scanner.decorators.safe_completion()`: Decorator that scans both inputs and outputs
 - `OpenAIPromptScanner`: Scanner implementation for OpenAI
 - `AnthropicPromptScanner`: Scanner implementation for Anthropic
 - `BasePromptScanner`: Abstract base class for custom scanners
@@ -303,22 +312,20 @@ class MyCustomScanner(BasePromptScanner):
 
 ### Decorators
 
-- `scan_prompt`: Decorator that scans prompts before passing them to decorated functions
+- `scanner.decorators.scan`: Decorator that scans prompts before passing them to decorated functions
   - Parameters:
-    - `provider`: LLM provider ("openai" or "anthropic")
-    - `api_key`: API key (optional)
-    - `model`: Model to use (optional)
-    - `log_results`: Whether to log scan results
-    - `raise_on_unsafe`: Whether to raise exception for unsafe content
-    - `confidence_threshold`: Confidence threshold for warnings
-    - `allowed_categories`: List of category IDs to allow even if flagged
+    - `prompt_param`: The parameter name that contains the prompt (default: "prompt")
+  - Return value: 
+    - If content is safe: the return value of the decorated function
+    - If content is unsafe: returns the `PromptScanResult` object with details about the issue
 
-- `safe_completion`: Decorator that ensures both inputs and outputs are safe
+- `scanner.decorators.safe_completion`: Decorator that ensures both inputs and outputs are safe
   - Parameters:
-    - `provider`: LLM provider ("openai" or "anthropic")
-    - `api_key`: API key (optional)
-    - `model`: Model to use (optional)
-    - `fallback_response`: Response to return if unsafe content detected
+    - `prompt_param`: The parameter name that contains the prompt (default: "prompt")
+  - Return value:
+    - If input is safe and output is safe: the return value of the decorated function
+    - If input is unsafe: returns the `PromptScanResult` object for the input scan
+    - If output is unsafe: returns the `PromptScanResult` object for the output scan
 
 ## Contributing
 

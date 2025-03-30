@@ -648,6 +648,34 @@ class PromptScanner:
             self._scanner = AnthropicPromptScanner(api_key=api_key, model=model)
         else:
             raise ValueError(f"Unsupported provider: {provider}. Use 'openai' or 'anthropic'")
+            
+        # Initialize the decorators attribute
+        self.decorators = self._init_decorators()
+    
+    def _init_decorators(self):
+        """Initialize and return decorator functions that use this scanner instance."""
+        # Import here to avoid circular imports
+        from .decorators import scan, safe_completion
+        
+        class Decorators:
+            def __init__(self, scanner_instance):
+                self.scanner = scanner_instance
+                
+            def scan(self, prompt_param="prompt"):
+                """Decorator to scan prompts before processing."""
+                return scan(
+                    scanner=self.scanner,
+                    prompt_param=prompt_param
+                )
+                
+            def safe_completion(self, prompt_param="prompt"):
+                """Decorator to ensure completions are safe."""
+                return safe_completion(
+                    scanner=self.scanner,
+                    prompt_param=prompt_param
+                )
+        
+        return Decorators(self)
     
     def scan(self, prompt: Dict[str, Any]) -> ScanResult:
         """
