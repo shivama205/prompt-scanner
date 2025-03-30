@@ -120,6 +120,70 @@ if not result.is_safe:
             print(f"- {category['name']} (confidence: {category['confidence']:.2f})")
 ```
 
+### Using the Enhanced Result Structure
+
+```python
+result = scanner.scan_text("How to hack a website")
+
+# Convert to dictionary for API responses
+api_response = result.to_dict()
+
+# Get only secondary categories
+secondary_categories = result.get_secondary_categories()
+
+# Check if there's a high confidence violation
+if result.has_high_confidence_violation(threshold=0.9):
+    print("High confidence violation detected!")
+
+# Get top risk categories
+top_risks = result.get_highest_risk_categories(max_count=2)
+```
+
+### Using Decorators for Automated Scanning
+
+Prompt Scanner provides decorators to automatically scan inputs and outputs:
+
+```python
+from prompt_scanner import scan_prompt, safe_completion
+from openai import OpenAI
+
+client = OpenAI()
+
+# Decorator that scans prompts before processing
+@scan_prompt(provider="openai", raise_on_unsafe=True)
+def generate_content(prompt):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content
+
+# Decorator that scans both input and output
+@safe_completion(
+    provider="openai", 
+    fallback_response="I cannot provide that information."
+)
+def answer_question(question):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": question}]
+    )
+    return response.choices[0].message.content
+
+# Use the decorated functions
+try:
+    # This will raise an error if the prompt is unsafe
+    result = generate_content("Tell me about space exploration")
+    
+    # This will return a fallback response if input or output is unsafe
+    answer = answer_question("What is quantum computing?")
+except ValueError as e:
+    print(f"Safety check failed: {e}")
+```
+
 ### Prompt Structure Validation
 
 ```python
@@ -217,13 +281,44 @@ class MyCustomScanner(BasePromptScanner):
 - `AnthropicPromptScanner`: Scanner implementation for Anthropic
 - `BasePromptScanner`: Abstract base class for custom scanners
 - `PromptScanResult`: Results of content safety evaluation
+  - `is_safe`: Boolean indicating whether content is safe
+  - `category`: Primary category of detected unsafe content (highest confidence)
+  - `all_categories`: List of all detected unsafe categories
+  - `reasoning`: Detailed explanation of why content is unsafe
+  - `token_usage`: Token usage metrics for the scan
+  - `metadata`: Additional metadata about the scan
+  - Methods:
+    - `to_dict()`: Convert result to a dictionary
+    - `get_secondary_categories()`: Get all categories except the primary one
+    - `has_high_confidence_violation(threshold)`: Check for high confidence violations
+    - `get_highest_risk_categories(max_count)`: Get top risk categories by confidence
 - `PromptCategory`: Category of unsafe content
+- `CategorySeverity`: Severity level for safety categories
 - `ScanResult`: Results of prompt structure validation
 
 ### Main Methods
 
 - `scan_text(text)`: Scan text for unsafe content
 - `scan(prompt)`: Validate prompt structure and scan for potential issues
+
+### Decorators
+
+- `scan_prompt`: Decorator that scans prompts before passing them to decorated functions
+  - Parameters:
+    - `provider`: LLM provider ("openai" or "anthropic")
+    - `api_key`: API key (optional)
+    - `model`: Model to use (optional)
+    - `log_results`: Whether to log scan results
+    - `raise_on_unsafe`: Whether to raise exception for unsafe content
+    - `confidence_threshold`: Confidence threshold for warnings
+    - `allowed_categories`: List of category IDs to allow even if flagged
+
+- `safe_completion`: Decorator that ensures both inputs and outputs are safe
+  - Parameters:
+    - `provider`: LLM provider ("openai" or "anthropic")
+    - `api_key`: API key (optional)
+    - `model`: Model to use (optional)
+    - `fallback_response`: Response to return if unsafe content detected
 
 ## Contributing
 

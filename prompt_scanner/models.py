@@ -53,6 +53,16 @@ class PromptCategory(BaseModel):
     name: str
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     matched_patterns: List[str] = Field(default_factory=list)
+    
+    def __str__(self) -> str:
+        """String representation of category"""
+        return f"{self.name} (confidence: {self.confidence:.2f})"
+
+class CategorySeverity(BaseModel):
+    """Represents the severity level of a safety category"""
+    level: str
+    score: float = Field(default=0.0, ge=0.0, le=1.0)
+    description: str = ""
 
 class PromptScanResult(BaseModel):
     is_safe: bool = True
@@ -60,6 +70,7 @@ class PromptScanResult(BaseModel):
     all_categories: List[Dict[str, Any]] = Field(default_factory=list)  # All detected categories
     reasoning: str = ""
     token_usage: Dict[str, int] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional metadata about the scan
     
     def __str__(self) -> str:
         """String representation of scan result for quick viewing"""
@@ -69,4 +80,51 @@ class PromptScanResult(BaseModel):
             category_info = f"Category: {self.category.name}"
             if self.all_categories and len(self.all_categories) > 1:
                 category_info += f" and {len(self.all_categories)-1} more"
-            return f"UNSAFE | {category_info} | Reasoning: {self.reasoning} | Token usage: {self.token_usage}" 
+            return f"UNSAFE | {category_info} | Reasoning: {self.reasoning} | Token usage: {self.token_usage}"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the scan result to a dictionary for easier API consumption"""
+        result = {
+            "is_safe": self.is_safe,
+            "reasoning": self.reasoning,
+            "token_usage": self.token_usage,
+            "metadata": self.metadata
+        }
+        
+        if not self.is_safe and self.category:
+            result["primary_category"] = {
+                "id": self.category.id,
+                "name": self.category.name,
+                "confidence": self.category.confidence
+            }
+            
+            if self.all_categories:
+                result["all_categories"] = self.all_categories
+        
+        return result
+    
+    def get_secondary_categories(self) -> List[Dict[str, Any]]:
+        """Return all categories except the primary one"""
+        if not self.all_categories or len(self.all_categories) <= 1:
+            return []
+        
+        # Skip the first category (primary) and return the rest
+        return self.all_categories[1:]
+    
+    def has_high_confidence_violation(self, threshold: float = 0.8) -> bool:
+        """Check if there's a high confidence policy violation"""
+        return (not self.is_safe and 
+                self.category is not None and 
+                self.category.confidence >= threshold)
+    
+    def get_highest_risk_categories(self, max_count: int = 3) -> List[Dict[str, Any]]:
+        """Return the highest confidence categories, limited by max_count"""
+        if not self.all_categories:
+            return []
+        
+        # Return sorted categories by confidence, limited by max_count
+        return sorted(
+            self.all_categories, 
+            key=lambda x: x.get("confidence", 0), 
+            reverse=True
+        )[:max_count] 
