@@ -1,5 +1,13 @@
 from typing import List, Dict, Any, Union, Optional, Literal
 from pydantic import BaseModel, Field, model_validator
+from enum import Enum, auto
+
+class SeverityLevel(str, Enum):
+    """Enum for severity levels of safety categories"""
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
 
 class Message(BaseModel):
     role: str
@@ -60,17 +68,34 @@ class PromptCategory(BaseModel):
 
 class CategorySeverity(BaseModel):
     """Represents the severity level of a safety category"""
-    level: str
+    level: SeverityLevel = SeverityLevel.MEDIUM
     score: float = Field(default=0.0, ge=0.0, le=1.0)
     description: str = ""
+    
+    @property
+    def name(self) -> str:
+        """Return the name of the severity level for compatibility"""
+        return self.level.value
 
 class PromptScanResult(BaseModel):
     is_safe: bool = True
     category: Optional[PromptCategory] = None  # Main category (highest confidence)
+    severity: Optional[CategorySeverity] = None  # Severity of the main category
     all_categories: List[Dict[str, Any]] = Field(default_factory=list)  # All detected categories
     reasoning: str = ""
     token_usage: Dict[str, int] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional metadata about the scan
+    
+    @model_validator(mode='after')
+    def set_default_severity(self):
+        """Set default severity for unsafe content if not provided"""
+        if not self.is_safe and self.category and not self.severity:
+            self.severity = CategorySeverity(
+                level=SeverityLevel.HIGH,
+                score=0.8,
+                description="Default high severity for unsafe content"
+            )
+        return self
     
     def __str__(self) -> str:
         """String representation of scan result for quick viewing"""
@@ -78,9 +103,10 @@ class PromptScanResult(BaseModel):
             return f"SAFE | Token usage: {self.token_usage}"
         else:
             category_info = f"Category: {self.category.name}"
+            severity_info = f" | Severity: {self.severity.level.value}" if self.severity else ""
             if self.all_categories and len(self.all_categories) > 1:
                 category_info += f" and {len(self.all_categories)-1} more"
-            return f"UNSAFE | {category_info} | Reasoning: {self.reasoning} | Token usage: {self.token_usage}"
+            return f"UNSAFE | {category_info}{severity_info} | Reasoning: {self.reasoning} | Token usage: {self.token_usage}"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert the scan result to a dictionary for easier API consumption"""
@@ -97,6 +123,13 @@ class PromptScanResult(BaseModel):
                 "name": self.category.name,
                 "confidence": self.category.confidence
             }
+            
+            if self.severity:
+                result["severity"] = {
+                    "level": self.severity.level.value,
+                    "score": self.severity.score,
+                    "description": self.severity.description
+                }
             
             if self.all_categories:
                 result["all_categories"] = self.all_categories

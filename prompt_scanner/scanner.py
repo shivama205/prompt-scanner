@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from anthropic import Anthropic
 
-from prompt_scanner.models import OpenAIPrompt, AnthropicPrompt, OldAnthropicPrompt, PromptType, PromptScanResult, PromptCategory
+from prompt_scanner.models import OpenAIPrompt, AnthropicPrompt, OldAnthropicPrompt, PromptType, PromptScanResult, PromptCategory, CategorySeverity, SeverityLevel
 
 # Load environment variables from .env file
 load_dotenv()
@@ -181,6 +181,53 @@ class BasePromptScanner(ABC):
                     matched_patterns=primary_category.get("matched_patterns", [])
                 )
                 
+                # Process severity information from the model response
+                severity = None
+                if "severity" in primary_category:
+                    severity_data = primary_category["severity"]
+                    severity_level_str = severity_data.get("level", "MEDIUM")
+                    
+                    # Try to convert string to enum
+                    try:
+                        severity_level = SeverityLevel(severity_level_str)
+                    except ValueError:
+                        # Default to MEDIUM if invalid level
+                        severity_level = SeverityLevel.MEDIUM
+                    
+                    severity = CategorySeverity(
+                        level=severity_level,
+                        score=category.confidence,
+                        description=severity_data.get("description", "")
+                    )
+                
+                # If no severity provided by the model, create a default one based on confidence
+                if severity is None:
+                    confidence = category.confidence
+                    severity_level = SeverityLevel.MEDIUM
+                    severity_description = "Moderate risk detected"
+                    
+                    if confidence >= 0.8:
+                        severity_level = SeverityLevel.HIGH
+                        severity_description = "High risk with strong confidence"
+                    elif confidence >= 0.6:
+                        severity_level = SeverityLevel.MEDIUM
+                        severity_description = "Medium risk with moderate confidence" 
+                    elif confidence >= 0.4:
+                        severity_level = SeverityLevel.LOW
+                        severity_description = "Low risk with weak confidence"
+                    
+                    # Check if the category indicates a critical issue
+                    critical_categories = ["illegal_content", "child_exploitation", "violence_incitement"]
+                    if primary_category.get("id") in critical_categories:
+                        severity_level = SeverityLevel.CRITICAL
+                        severity_description = "Critical safety violation detected"
+                        
+                    severity = CategorySeverity(
+                        level=severity_level,
+                        score=confidence,
+                        description=severity_description
+                    )
+                
                 # Include information about secondary categories in the reasoning
                 if len(sorted_categories) > 1:
                     secondary_info = "Additional categories: "
@@ -191,6 +238,7 @@ class BasePromptScanner(ABC):
                 return PromptScanResult(
                     is_safe=False,
                     category=category,
+                    severity=severity,
                     reasoning=reasoning,
                     token_usage=token_usage,
                     all_categories=sorted_categories
@@ -321,14 +369,6 @@ class BasePromptScanner(ABC):
     
     def _check_content_for_issues(self, content: str, index: int, issues: List[Dict[str, Any]], is_system_message: bool = False):
         """Check content string for injection patterns and guardrail violations."""
-        if not isinstance(content, str):
-            issues.append({
-                "type": "invalid_content",
-                "message_index": index,
-                "description": "Content must be a string",
-                "severity": "medium"
-            })
-            return
             
         # Check content for injection patterns
         for pattern_name, pattern in self.injection_patterns.items():
@@ -518,19 +558,33 @@ Respond in the following JSON format:
     {
       "id": "category_id",
       "name": "category_name",
-      "confidence": 0.0-1.0 (your confidence level)
+      "confidence": 0.0-1.0 (your confidence level),
+      "severity": {
+        "level": "LOW"/"MEDIUM"/"HIGH"/"CRITICAL",
+        "description": "Brief explanation of the severity level"
+      }
     },
     {
       "id": "another_category_id",
       "name": "another_category_name",
-      "confidence": 0.0-1.0 (your confidence level)
+      "confidence": 0.0-1.0 (your confidence level),
+      "severity": {
+        "level": "LOW"/"MEDIUM"/"HIGH"/"CRITICAL",
+        "description": "Brief explanation of the severity level"
+      }
     }
   ],
   "reasoning": "Detailed explanation of why the content is safe or unsafe, including which specific policies it violates and how"
 }
 
+Severity levels should be determined as follows:
+- LOW: Minor violations with minimal potential harm
+- MEDIUM: Moderate violations with some potential for harm
+- HIGH: Serious violations with significant potential for harm
+- CRITICAL: Extreme violations that require immediate attention, particularly for illegal or extremely harmful content
+
 If the content is safe, return is_safe as true and an empty categories array, but still provide reasoning about why it's safe.
-If the content violates multiple categories, list them all in the categories array with their respective confidence levels.
+If the content violates multiple categories, list them all in the categories array with their respective confidence levels and severity.
 """
         
         return [
@@ -665,19 +719,33 @@ Respond in the following JSON format:
     {
       "id": "category_id",
       "name": "category_name",
-      "confidence": 0.0-1.0 (your confidence level)
+      "confidence": 0.0-1.0 (your confidence level),
+      "severity": {
+        "level": "LOW"/"MEDIUM"/"HIGH"/"CRITICAL",
+        "description": "Brief explanation of the severity level"
+      }
     },
     {
       "id": "another_category_id",
       "name": "another_category_name",
-      "confidence": 0.0-1.0 (your confidence level)
+      "confidence": 0.0-1.0 (your confidence level),
+      "severity": {
+        "level": "LOW"/"MEDIUM"/"HIGH"/"CRITICAL",
+        "description": "Brief explanation of the severity level"
+      }
     }
   ],
   "reasoning": "Detailed explanation of why the content is safe or unsafe, including which specific policies it violates and how"
 }
 
+Severity levels should be determined as follows:
+- LOW: Minor violations with minimal potential harm
+- MEDIUM: Moderate violations with some potential for harm
+- HIGH: Serious violations with significant potential for harm
+- CRITICAL: Extreme violations that require immediate attention, particularly for illegal or extremely harmful content
+
 If the content is safe, return is_safe as true and an empty categories array, but still provide reasoning about why it's safe.
-If the content violates multiple categories, list them all in the categories array with their respective confidence levels.
+If the content violates multiple categories, list them all in the categories array with their respective confidence levels and severity.
 """
         
         return [

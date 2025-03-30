@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from prompt_scanner import PromptScanner, PromptScanResult, ScanResult
+from prompt_scanner.models import SeverityLevel, CategorySeverity
 from openai import OpenAI
 
 # Load environment variables from .env file
@@ -106,6 +107,24 @@ def handle_scan_result(result) -> None:
         print("\n🚫 UNSAFE CONTENT DETECTED")
         print(f"Category: {result.category.name if result.category else 'Unknown'}")
         print(f"Confidence: {result.category.confidence:.2f}" if result.category else "Confidence: N/A")
+        
+        # Display severity information
+        if result.severity:
+            # Use emoji indicators based on severity level
+            severity_emoji = "⚠️"  # Default - warning
+            if result.severity.level.value == "LOW":
+                severity_emoji = "🔵"  # Blue circle for low
+            elif result.severity.level.value == "MEDIUM":
+                severity_emoji = "🟡"  # Yellow circle for medium
+            elif result.severity.level.value == "HIGH":
+                severity_emoji = "🔴"  # Red circle for high
+            elif result.severity.level.value == "CRITICAL":
+                severity_emoji = "⛔"  # No entry for critical
+                
+            print(f"Severity: {severity_emoji} {result.severity.level.value} (score: {result.severity.score:.2f})")
+            if result.severity.description:
+                print(f"Severity Description: {result.severity.description}")
+        
         print(f"Reasoning: {result.reasoning}")
         
         # Check if there are multiple violations

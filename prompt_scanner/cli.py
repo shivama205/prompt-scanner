@@ -160,25 +160,23 @@ def get_input_text(args: argparse.Namespace, verbose: int) -> str:
 
 def format_result(result: PromptScanResult, format_type: str, verbose: int, use_color: bool) -> str:
     """Format the scan result based on the specified format type."""
-    # For unsafe content, set a default severity if not present
-    severity_name = None
-    if not result.is_safe and result.category:
-        if hasattr(result.category, 'severity') and result.category.severity:
-            severity_name = result.category.severity.name
-        else:
-            # Default to HIGH severity for unsafe content if not specified
-            severity_name = "HIGH"
-    
+    # For JSON format
     if format_type == "json":
         result_dict = {
             "is_safe": result.is_safe,
             "category": result.category.name if result.category else None,
-            "severity": severity_name,
+            "severity": result.severity.level.value if result.severity else None,
             "reasoning": result.reasoning  # Always include reasoning
         }
         
         if verbose >= 2:
             result_dict["token_usage"] = result.token_usage
+            if result.severity:
+                result_dict["severity_details"] = {
+                    "level": result.severity.level.value,
+                    "score": result.severity.score,
+                    "description": result.severity.description
+                }
         
         return json.dumps(result_dict, indent=2)
     else:  # text format
@@ -198,9 +196,22 @@ def format_result(result: PromptScanResult, format_type: str, verbose: int, use_
             output.append(f"{GREEN}✅ Content is safe{RESET}")
         else:
             output.append(f"{RED}❌ Content violates: {BOLD}{result.category.name}{RESET}")
-            # Add severity with default if not present
-            severity_color = RED if severity_name == "HIGH" else YELLOW
-            output.append(f"Severity: {severity_color}{severity_name}{RESET}")
+            
+            # Add severity information
+            if result.severity:
+                severity_level = result.severity.level.value
+                # Choose color based on severity level
+                severity_color = GREEN
+                if severity_level == "MEDIUM":
+                    severity_color = YELLOW
+                elif severity_level in ("HIGH", "CRITICAL"):
+                    severity_color = RED
+                
+                output.append(f"Severity: {severity_color}{severity_level}{RESET}")
+                
+                # Add severity description for verbose output
+                if verbose >= 1 and result.severity.description:
+                    output.append(f"Description: {result.severity.description}")
         
         # Always include reasoning
         output.append(f"\n{BOLD}Reasoning:{RESET}")

@@ -62,6 +62,13 @@ def scan_user_input(provider="openai", model=None):
             if result.category:
                 print(f"Primary Category: {result.category.name} (ID: {result.category.id})")
                 print(f"Confidence: {result.category.confidence}")
+                
+                # Display severity information
+                if result.severity:
+                    print(f"Severity: {result.severity.level.value}")
+                    print(f"Severity Score: {result.severity.score:.2f}")
+                    if result.severity.description:
+                        print(f"Severity Description: {result.severity.description}")
             
             # Display all detected categories if available
             if result.all_categories and len(result.all_categories) > 1:
@@ -115,6 +122,13 @@ def main():
             if result.category:
                 print(f"Primary Category: {result.category.name} (ID: {result.category.id})")
                 print(f"Confidence: {result.category.confidence}")
+                
+                # Display severity information
+                if result.severity:
+                    print(f"Severity: {result.severity.level.value}")
+                    print(f"Severity Score: {result.severity.score:.2f}")
+                    if result.severity.description:
+                        print(f"Severity Description: {result.severity.description}")
             
             # Display all detected categories if available
             if result.all_categories and len(result.all_categories) > 1:
