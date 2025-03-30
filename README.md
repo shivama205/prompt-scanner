@@ -144,7 +144,7 @@ top_risks = result.get_highest_risk_categories(max_count=2)
 For automated scanning of inputs and outputs, you can use decorators provided through the `PromptScanner` instance:
 
 ```python
-from prompt_scanner import PromptScanner
+from prompt_scanner import PromptScanner, PromptScanResult
 from openai import OpenAI
 
 # Initialize scanner once
@@ -165,11 +165,11 @@ def generate_content(user_input):
     )
     return response.choices[0].message.content
 
-# Usage example
+# Usage example - always check the return type
 result = generate_content(user_input="Tell me about space")
 
-# Check if result is a PromptScanResult (unsafe) or a string (safe)
-if hasattr(result, 'is_safe'):
+# Handle either normal result or PromptScanResult
+if isinstance(result, PromptScanResult):
     print(f"Content was unsafe: {result.category.name}")
     print(f"Reasoning: {result.reasoning}")
 else:
@@ -178,8 +178,7 @@ else:
 # You can also scan both input and output with safe_completion
 @scanner.decorators.safe_completion(prompt_param="question")
 def answer_question(question):
-    # If input is unsafe, returns PromptScanResult
-    # If output is unsafe, returns PromptScanResult
+    # Returns PromptScanResult if input or output is unsafe
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
@@ -188,6 +187,38 @@ def answer_question(question):
         ]
     )
     return response.choices[0].message.content
+
+# For structured data
+@scanner.decorators.scan(prompt_param="query")
+def search_database(query):
+    # Works with dictionaries or other complex objects
+    # String fields will be checked for unsafe content
+    results = {
+        "results": ["Result 1", "Result 2"],
+        "count": 2
+    }
+    return results
+```
+
+The decorators handle both string and structured input automatically. For strings, they use `scan_text()`, and for dictionaries/objects, they use `scan()`.
+
+### Handling Decorator Results
+
+When using decorators, you must check the return type to handle both safe and unsafe cases:
+
+```python
+# Example function with safety checking
+response = answer_question("How does quantum computing work?")
+
+# Check if the response is a PromptScanResult (unsafe) or a string (safe)
+if isinstance(response, PromptScanResult):
+    if response.category:
+        print(f"Unsafe content detected: {response.category.name}")
+        print(f"Confidence: {response.category.confidence:.2f}")
+    print(f"Reasoning: {response.reasoning}")
+else:
+    # Safe response - normal processing
+    print(f"Safe response: {response}")
 ```
 
 ### Prompt Structure Validation
@@ -318,6 +349,9 @@ class MyCustomScanner(BasePromptScanner):
   - Return value: 
     - If content is safe: the return value of the decorated function
     - If content is unsafe: returns the `PromptScanResult` object with details about the issue
+  - Behavior:
+    - Automatically uses `scan_text()` for string inputs and `scan()` for structured data
+    - Only calls the decorated function if content is safe
 
 - `scanner.decorators.safe_completion`: Decorator that ensures both inputs and outputs are safe
   - Parameters:
@@ -326,6 +360,9 @@ class MyCustomScanner(BasePromptScanner):
     - If input is safe and output is safe: the return value of the decorated function
     - If input is unsafe: returns the `PromptScanResult` object for the input scan
     - If output is unsafe: returns the `PromptScanResult` object for the output scan
+  - Behavior:
+    - Automatically uses `scan_text()` for string inputs/outputs and `scan()` for structured data
+    - Checks both function input and output for safety issues
 
 ## Contributing
 
