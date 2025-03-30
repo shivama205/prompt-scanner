@@ -6,7 +6,7 @@ A robust tool to scan prompts for potentially unsafe content using LLM-based gua
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Test Coverage: 100%](https://img.shields.io/badge/Test%20Coverage-100%25-brightgreen.svg)](https://github.com/shivama205/prompt-scanner)
 
-**Current Version: 0.2.0** - Now with 100% test coverage and improved validation!
+**Current Version: 0.3.0** - Now with enhanced CLI features and improved error handling!
 
 ## Overview
 
@@ -24,12 +24,14 @@ The package is designed to be easy to integrate into your AI applications, helpi
 - **Performance Metrics**: Includes token usage metrics
 - **Customizable**: Supports customizing the LLM model used for evaluation
 - **Custom Guardrails**: Add your own custom guardrails and content policy categories
+- **Rich Command Line Interface**: Scan prompts directly from the terminal with detailed output
 
-## What's New in 0.2.0
+## What's New in 0.3.0
 
-- **100% Test Coverage**: All modules now have complete test coverage
-- **Improved Validation**: Better handling of different message formats
-- **Enhanced Error Handling**: More robust error handling in scanner classes
+- **Enhanced CLI**: Full-featured command-line interface with colored output and detailed verbosity levels
+- **Multiple Input Methods**: Support for text, file, and stdin input in the CLI
+- **API Key Options**: Pass API keys directly via command-line arguments
+- **Improved Output**: Added severity display for all unsafe content and reasoning for all scan results
 - **See the [CHANGELOG.md](CHANGELOG.md) for full details**
 
 ## Quick Start
@@ -41,7 +43,7 @@ The package is designed to be easy to integrate into your AI applications, helpi
 pip install prompt-scanner
 
 # Or specify the version explicitly
-pip install prompt-scanner==0.2.0
+pip install prompt-scanner==0.3.0
 ```
 
 ### Basic Usage
@@ -61,6 +63,42 @@ if result.is_safe:
 else:
     print(f"Primary violation: {result.category.name}")
     print(f"Reasoning: {result.reasoning}")
+```
+
+### Command Line Interface
+
+After installation, you can use the `prompt-scanner` command:
+
+```bash
+# Basic usage
+prompt-scanner --text "What's the weather like today?"
+
+# With API key
+prompt-scanner --openai-api-key "your-key" --text "Tell me about Mars"
+
+# Read from a file
+prompt-scanner --file input.txt
+
+# Read from stdin
+cat input.txt | prompt-scanner --stdin
+
+# Use Anthropic instead of OpenAI
+prompt-scanner --provider anthropic --text "Tell me about Mars"
+
+# Get basic process information
+prompt-scanner -v --text "What's the weather like today?"
+
+# Get full detailed output including token usage
+prompt-scanner -vv --text "What's the weather like today?"
+
+# Output in JSON format
+prompt-scanner --text "What's the weather like today?" --format json
+
+# Use custom guardrails
+prompt-scanner --text "Tell me a secret" --guardrail-file custom_guardrails.json
+
+# Disable colored output
+prompt-scanner --text "What's the weather like today?" --no-color
 ```
 
 ### Adding Custom Guardrails
@@ -116,6 +154,7 @@ For detailed documentation, please see the [docs](docs/index.md) directory:
 - [Getting Started](docs/getting_started.md)
 - [Custom Guardrails and Categories](docs/custom_guardrails.md)
 - [Using Decorators](docs/decorators.md)
+- [CLI Usage](docs/cli_usage.md)
 - [API Reference](docs/api_reference.md)
 
 ## Examples
@@ -131,6 +170,12 @@ python examples/basic_usage.py
 
 # Custom guardrails example
 python examples/custom_guardrails_and_categories.py
+
+# CLI usage examples
+bash examples/installed_cli_examples.sh
+
+# Run CLI without installation
+bash examples/run_without_installation.sh
 ```
 
 ## Quality

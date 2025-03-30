@@ -33,6 +33,11 @@ setup(
         "requests>=2.31.0",
         "python-dotenv>=1.0.0"
     ],
+    entry_points={
+        "console_scripts": [
+            "prompt-scanner=prompt_scanner.cli:main",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

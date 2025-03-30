@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prompt-scanner"
-version = "0.2.0"
+version = "0.3.0"
 description = "A tool to scan prompts for potentially unsafe content using LLM-based guardrails"
 readme = "README.md"
 authors = [
@@ -32,6 +32,9 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0"
 ]
+
+[project.scripts]
+prompt-scanner = "prompt_scanner.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["prompt_scanner", "prompt_scanner.*"]

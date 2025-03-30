@@ -1,7 +1,8 @@
 from prompt_scanner.scanner import PromptScanner, ScanResult, BasePromptScanner, OpenAIPromptScanner, AnthropicPromptScanner
 from prompt_scanner.models import PromptScanResult, PromptCategory, CategorySeverity, CustomGuardrail, CustomCategory
+import prompt_scanner.decorators as decorators
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     # Main scanner classes
     "PromptScanner", 
@@ -17,5 +18,8 @@ __all__ = [
     
     # Custom guardrail models
     "CustomGuardrail",
-    "CustomCategory"
+    "CustomCategory",
+    
+    # Module imports
+    "decorators"
 ] 

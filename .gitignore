@@ -131,3 +131,6 @@ credentials.json
 
 # PyPI config with API tokens
 .pypirc 
+
+# Roadmap
+ROADMAP.md

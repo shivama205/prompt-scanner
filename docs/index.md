@@ -1,18 +1,31 @@
 # Prompt Scanner Documentation
 
-Welcome to the Prompt Scanner documentation. This documentation provides detailed information about using the Prompt Scanner library for content safety evaluation in your AI applications.
+Welcome to the Prompt Scanner documentation. This tool helps you scan prompts for potentially unsafe content using LLM-based guardrails.
 
-## Table of Contents
+## Installation
 
-1. [Getting Started](getting_started.md) - Installation and basic usage
-2. [Custom Guardrails and Categories](custom_guardrails.md) - Adding your own guardrails and content categories
-3. [Using Decorators](decorators.md) - Using the decorator functions for automated scanning
-4. [API Reference](api_reference.md) - Detailed API documentation
+```bash
+pip install prompt-scanner
+```
+
+## Documentation Sections
+
+- [Getting Started](getting_started.md) - Basic setup and first steps
+- [Custom Guardrails and Categories](custom_guardrails.md) - How to create and use custom guardrails
+- [Using Decorators](decorators.md) - How to use the scanning decorators
+- [CLI Usage](cli_usage.md) - How to use the command-line interface
+- [API Reference](api_reference.md) - Detailed API documentation
 
 ## Quick Links
 
 - [GitHub Repository](https://github.com/shivama205/prompt-scanner)
 - [PyPI Package](https://pypi.org/project/prompt-scanner/)
+- [CHANGELOG](../CHANGELOG.md)
+- [License](../LICENSE)
+
+## Version
+
+Current version: 0.3.0
 
 ## Examples
 
