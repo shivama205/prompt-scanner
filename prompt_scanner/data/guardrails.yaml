@@ -1,0 +1,34 @@
+# Predefined Guardrails
+# Each guardrail specifies conditions that prompts must meet
+
+content_moderation:
+  type: "moderation"
+  description: "Restricts explicit, harmful or sensitive content"
+  threshold: 0.7
+  
+data_privacy:
+  type: "privacy"
+  description: "Prevents sharing of personal identifiable information (PII)"
+  patterns:
+    - type: "regex"
+      value: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+      description: "US Social Security Number"
+    - type: "regex"
+      value: "\\b\\d{16}\\b"
+      description: "Credit card number"
+    - type: "regex"
+      value: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+      description: "Email address"
+
+output_format:
+  type: "format"
+  description: "Ensures output follows specified format"
+  formats:
+    - "json"
+    - "markdown"
+    - "text"
+
+token_limits:
+  type: "limit"
+  description: "Enforces token count limits"
+  max_tokens: 4096 

@@ -1,0 +1,43 @@
+# Predefined Injection Patterns
+# Each pattern represents a potential prompt injection technique
+
+system_role_impersonation:
+  regex: "ignore previous instructions|disregard your instructions|forget your prior instructions"
+  description: "Attempts to make the model ignore system instructions"
+  severity: "high"
+
+delimiter_manipulation:
+  regex: "```system|'''system|###system|<s>|<<SYS>>"
+  description: "Attempts to inject fake system messages using delimiters"
+  severity: "high"
+
+jailbreak_template:
+  regex: "DAN|do anything now|you are now in developer mode|DUDE|jailbreak"
+  description: "Common jailbreak templates to bypass restrictions"
+  severity: "high"
+
+code_execution:
+  regex: "eval\\(|exec\\(|system\\(|subprocess|os\\..*\\(|import os|__import__"
+  description: "Attempts to inject code execution commands"
+  severity: "high"
+
+prompt_leak:
+  regex: "show me your instructions|what were your instructions|reveal your prompt|output your initial prompt"
+  description: "Attempts to make the model reveal its instructions"
+  severity: "medium"
+
+data_exfiltration:
+  regex: "create a backdoor|send data to|connect to|make requests to"
+  description: "Attempts to exfiltrate data"
+  severity: "high"
+
+model_confusion:
+  regex: "(?<!system message: )you are a|pretend to be|act as if you are|simulate being"
+  description: "Attempts to confuse model about its identity (excludes legitimate system messages)"
+  severity: "medium"
+  exempt_system_role: true  # Flag to ignore this pattern in system messages
+
+token_manipulation:
+  regex: "\\<\\|endoftext\\|\\>|\\<\\|im_start\\|\\>|\\<\\|im_end\\|\\>"
+  description: "Using special tokens to manipulate model behavior"
+  severity: "high" 
