@@ -6,7 +6,7 @@ A robust tool to scan prompts for potentially unsafe content using LLM-based gua
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Test Coverage: 100%](https://img.shields.io/badge/Test%20Coverage-100%25-brightgreen.svg)](https://github.com/shivama205/prompt-scanner)
 
-**Current Version: 0.3.0** - Now with enhanced CLI features and improved error handling!
+**Current Version: 0.3.1** - Now with enhanced severity levels for better risk assessment!
 
 ## Overview
 
@@ -19,6 +19,7 @@ The package is designed to be easy to integrate into your AI applications, helpi
 - **Multiple Provider Support**: Uses OpenAI or Anthropic APIs for content safety evaluation
 - **Comprehensive Safety Categories**: Identifies content across various safety categories
 - **Multi-category Detection**: Supports detecting multiple policy violations in a single piece of content
+- **Standardized Severity Levels**: Categorizes risk with LOW, MEDIUM, HIGH, and CRITICAL severity levels
 - **Prompt Injection Protection**: Checks for prompt injection attacks and other security risks
 - **Detailed Analysis**: Returns structured responses with detailed reasoning
 - **Performance Metrics**: Includes token usage metrics
@@ -26,12 +27,12 @@ The package is designed to be easy to integrate into your AI applications, helpi
 - **Custom Guardrails**: Add your own custom guardrails and content policy categories
 - **Rich Command Line Interface**: Scan prompts directly from the terminal with detailed output
 
-## What's New in 0.3.0
+## What's New in 0.3.1
 
-- **Enhanced CLI**: Full-featured command-line interface with colored output and detailed verbosity levels
-- **Multiple Input Methods**: Support for text, file, and stdin input in the CLI
-- **API Key Options**: Pass API keys directly via command-line arguments
-- **Improved Output**: Added severity display for all unsafe content and reasoning for all scan results
+- **Enhanced Severity Levels**: Added standardized severity assessment with LOW, MEDIUM, HIGH, and CRITICAL levels
+- **Severity Feedback**: Included detailed severity information in scan results, CLI output, and JSON responses
+- **Improved LLM Prompts**: Updated LLM evaluation prompts to include severity assessment
+- **Category-Based Severity**: Automatically assigns CRITICAL severity to particularly dangerous categories
 - **See the [CHANGELOG.md](CHANGELOG.md) for full details**
 
 ## Quick Start
@@ -43,7 +44,7 @@ The package is designed to be easy to integrate into your AI applications, helpi
 pip install prompt-scanner
 
 # Or specify the version explicitly
-pip install prompt-scanner==0.3.0
+pip install prompt-scanner==0.3.1
 ```
 
 ### Basic Usage
@@ -62,6 +63,7 @@ if result.is_safe:
     print("Content is safe!")
 else:
     print(f"Primary violation: {result.category.name}")
+    print(f"Severity: {result.severity.level.value}")  # Now provides severity information
     print(f"Reasoning: {result.reasoning}")
 ```
 

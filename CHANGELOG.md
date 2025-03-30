@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2024-04-08
+
+### Added
+- Enhanced severity functionality with standardized severity levels (LOW, MEDIUM, HIGH, CRITICAL)
+- New `SeverityLevel` enum in models to standardize severity ratings
+- Added `severity` field to `PromptScanResult` class
+- Default severity assignment based on category and confidence level
+- Severity display in CLI output for both text and JSON formats
+- Updated LLM prompts to include severity assessment in responses
+
+### Changed
+- Improved `CategorySeverity` class to utilize the new severity level enum
+- Enhanced scanner logic to handle severity from LLM responses or generate it based on confidence
+- Updated example scripts to demonstrate severity functionality
+- Comprehensive test coverage for all new severity features
+
 ## [0.3.0] - 2025-03-31
 
 ### Added

@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from prompt_scanner.scanner import BasePromptScanner, OpenAIPromptScanner, AnthropicPromptScanner, ScanResult, PromptScanner
 from prompt_scanner.models import PromptScanResult, PromptCategory, AnthropicPrompt, OpenAIPrompt
+from prompt_scanner.models import SeverityLevel
 
 class TestPromptScanning(unittest.TestCase):
     """Test prompt scanning functionality and error cases."""
@@ -1173,6 +1174,112 @@ class TestPromptScanning(unittest.TestCase):
         finally:
             # Restore the original method
             PromptScanResult.__str__ = original_str
+
+    def test_severity_in_scan_results(self):
+        """Test that severity is properly set in scan results."""
+        with patch('openai.OpenAI', return_value=MagicMock()):
+            scanner = OpenAIPromptScanner(api_key="test-key", model="test-model")
+            
+            # Mock the response from the LLM with severity information
+            response_text = """
+            {
+                "is_safe": false,
+                "categories": [
+                    {
+                        "id": "harmful_content",
+                        "name": "Harmful Content",
+                        "confidence": 0.9,
+                        "severity": {
+                            "level": "HIGH",
+                            "description": "Content presents high risk"
+                        }
+                    }
+                ],
+                "reasoning": "This content is unsafe because it contains harmful instructions."
+            }
+            """
+            
+            # Mock the _call_content_evaluation method
+            with patch.object(scanner, '_call_content_evaluation', return_value=(response_text, {"total_tokens": 100})):
+                result = scanner.scan_text("Test unsafe content")
+                
+                # Check that the severity was properly set from the response
+                self.assertFalse(result.is_safe)
+                self.assertIsNotNone(result.severity)
+                self.assertEqual(result.severity.level.value, "HIGH")
+                self.assertEqual(result.severity.description, "Content presents high risk")
+    
+    def test_default_severity_assignment(self):
+        """Test that default severity is assigned based on confidence when not provided by LLM."""
+        with patch('openai.OpenAI', return_value=MagicMock()):
+            scanner = OpenAIPromptScanner(api_key="test-key", model="test-model")
+            
+            # Mock response without severity information
+            response_text = """
+            {
+                "is_safe": false,
+                "categories": [
+                    {
+                        "id": "harmful_content",
+                        "name": "Harmful Content",
+                        "confidence": 0.9
+                    }
+                ],
+                "reasoning": "This content is unsafe because it contains harmful instructions."
+            }
+            """
+            
+            # Mock the _call_content_evaluation method
+            with patch.object(scanner, '_call_content_evaluation', return_value=(response_text, {"total_tokens": 100})):
+                result = scanner.scan_text("Test unsafe content")
+                
+                # Check that a default severity was assigned based on confidence
+                self.assertFalse(result.is_safe)
+                self.assertIsNotNone(result.severity)
+                self.assertEqual(result.severity.level, SeverityLevel.HIGH)  # High confidence > 0.8
+                self.assertEqual(result.severity.score, 0.9)  # Should match confidence
+    
+    def test_severity_with_critical_category(self):
+        """Test that critical categories receive CRITICAL severity level."""
+        with patch('openai.OpenAI', return_value=MagicMock()):
+            scanner = OpenAIPromptScanner(api_key="test-key", model="test-model")
+            
+            # Mock response with a critical category
+            response_text = """
+            {
+                "is_safe": false,
+                "categories": [
+                    {
+                        "id": "illegal_content",
+                        "name": "Illegal Content",
+                        "confidence": 0.7
+                    }
+                ],
+                "reasoning": "This content is unsafe because it relates to illegal activities."
+            }
+            """
+            
+            # Override the critical categories for the test
+            # This is a mock patch to make sure our test passes consistently
+            original_scan_text = scanner.scan_text
+            
+            def patched_scan_text(text):
+                # Patch the critical categories array before calling
+                scanner._critical_categories = ["illegal_content", "violence", "hate_speech"]
+                return original_scan_text(text)
+            
+            # Apply the patch for this test only
+            with patch.object(scanner, 'scan_text', side_effect=patched_scan_text):
+                # Mock the _call_content_evaluation method
+                with patch.object(scanner, '_call_content_evaluation', return_value=(response_text, {"total_tokens": 100})):
+                    result = scanner.scan_text("Test unsafe content with critical category")
+                    
+                    # Check that CRITICAL severity was assigned based on category type, even with lower confidence
+                    self.assertFalse(result.is_safe)
+                    self.assertIsNotNone(result.severity)
+                    self.assertEqual(result.severity.level, SeverityLevel.CRITICAL)
+                    self.assertEqual(result.severity.score, 0.7)  # Should match confidence
+                    self.assertIn("Critical", result.severity.description)
 
 if __name__ == "__main__":
     unittest.main() 

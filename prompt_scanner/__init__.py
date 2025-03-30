@@ -2,7 +2,7 @@ from prompt_scanner.scanner import PromptScanner, ScanResult, BasePromptScanner,
 from prompt_scanner.models import PromptScanResult, PromptCategory, CategorySeverity, CustomGuardrail, CustomCategory
 import prompt_scanner.decorators as decorators
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     # Main scanner classes
     "PromptScanner", 

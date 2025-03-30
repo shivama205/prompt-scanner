@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prompt-scanner"
-version = "0.3.0"
-description = "A tool to scan prompts for potentially unsafe content using LLM-based guardrails"
+version = "0.3.1"
+description = "Scan prompts for LLMs to ensure content safety and apply guardrails"
 readme = "README.md"
 authors = [
     {name = "Shivam Aggarwal", email = "shivama205@gmail.com"}

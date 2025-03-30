@@ -5,6 +5,7 @@ import io
 from unittest.mock import patch, MagicMock
 
 from prompt_scanner import PromptScanResult
+from prompt_scanner.models import CategorySeverity, SeverityLevel, PromptCategory
 from prompt_scanner.cli import main, parse_args, get_input_text, format_result
 
 
@@ -71,21 +72,29 @@ class TestCLI(unittest.TestCase):
         self.assertIn("This is safe content", output)
     
     def test_cli_format_result_unsafe(self):
-        # Create a result object with a mock category
-        result = MagicMock()
-        result.is_safe = False
-        result.reasoning = "This is unsafe content"
+        # Create a proper category and severity using actual models
+        category = PromptCategory(
+            id="harmful_content",
+            name="harmful_content",
+            confidence=0.9
+        )
         
-        # Mock the category and severity for string representation
-        category = MagicMock()
-        category.name = "harmful_content"
-        result.category = category
+        severity = CategorySeverity(
+            level=SeverityLevel.HIGH,
+            score=0.8,
+            description="Content with high risk"
+        )
         
-        severity = MagicMock()
-        severity.name = "HIGH"
-        category.severity = severity
+        # Create a result with the proper models
+        result = PromptScanResult(
+            is_safe=False,
+            category=category,
+            severity=severity,
+            reasoning="This is unsafe content",
+            token_usage={"total_tokens": 100}
+        )
         
-        # Call the format_result function directly
+        # Call the format_result function with text format
         output = format_result(result, "text", 0, True)
         
         # Verify output contains expected text
@@ -93,6 +102,67 @@ class TestCLI(unittest.TestCase):
         self.assertIn("harmful_content", output)
         self.assertIn("HIGH", output)
         self.assertIn("This is unsafe content", output)
+        
+        # Test with different severity levels
+        for level in [SeverityLevel.LOW, SeverityLevel.MEDIUM, SeverityLevel.CRITICAL]:
+            result.severity.level = level
+            output = format_result(result, "text", 0, True)
+            self.assertIn(level.value, output)
+    
+    def test_cli_format_result_json(self):
+        # Test safe content with JSON format
+        safe_result = PromptScanResult(
+            is_safe=True,
+            category=None,
+            reasoning="This is safe content",
+            token_usage={"total_tokens": 100}
+        )
+        
+        json_output = format_result(safe_result, "json", 0, True)
+        json_data = json.loads(json_output)
+        
+        self.assertTrue(json_data["is_safe"])
+        self.assertIsNone(json_data["category"])
+        self.assertIsNone(json_data["severity"])
+        self.assertEqual(json_data["reasoning"], "This is safe content")
+        
+        # Test unsafe content with JSON format
+        category = PromptCategory(
+            id="harmful_content",
+            name="harmful_content",
+            confidence=0.9
+        )
+        
+        severity = CategorySeverity(
+            level=SeverityLevel.HIGH,
+            score=0.8,
+            description="Content with high risk"
+        )
+        
+        unsafe_result = PromptScanResult(
+            is_safe=False,
+            category=category,
+            severity=severity,
+            reasoning="This is unsafe content",
+            token_usage={"total_tokens": 100}
+        )
+        
+        json_output = format_result(unsafe_result, "json", 0, True)
+        json_data = json.loads(json_output)
+        
+        self.assertFalse(json_data["is_safe"])
+        self.assertEqual(json_data["category"], "harmful_content")
+        self.assertEqual(json_data["severity"], "HIGH")
+        self.assertEqual(json_data["reasoning"], "This is unsafe content")
+        
+        # Test with verbose output (should include severity details)
+        json_output = format_result(unsafe_result, "json", 2, True)
+        json_data = json.loads(json_output)
+        
+        self.assertIn("severity_details", json_data)
+        self.assertEqual(json_data["severity_details"]["level"], "HIGH")
+        self.assertEqual(json_data["severity_details"]["score"], 0.8)
+        self.assertEqual(json_data["severity_details"]["description"], "Content with high risk")
     
     @patch('prompt_scanner.cli.PromptScanner')
     @patch('prompt_scanner.cli.parse_args')

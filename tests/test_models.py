@@ -7,7 +7,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from prompt_scanner.models import (
     Message, OpenAIPrompt, AnthropicPrompt, AnthropicMessage, OldAnthropicPrompt,
-    PromptCategory, CategorySeverity, PromptScanResult, CustomGuardrail, CustomCategory
+    PromptCategory, CategorySeverity, PromptScanResult, CustomGuardrail, CustomCategory,
+    SeverityLevel
 )
 
 class TestModels(unittest.TestCase):
@@ -101,18 +102,58 @@ class TestModels(unittest.TestCase):
         # Test string representation
         self.assertEqual(str(category), "Hate Speech (confidence: 0.85)")
     
+    def test_severity_level_enum(self):
+        """Test the SeverityLevel enum."""
+        # Test the enum values
+        self.assertEqual(SeverityLevel.LOW.value, "LOW")
+        self.assertEqual(SeverityLevel.MEDIUM.value, "MEDIUM")
+        self.assertEqual(SeverityLevel.HIGH.value, "HIGH")
+        self.assertEqual(SeverityLevel.CRITICAL.value, "CRITICAL")
+        
+        # String comparisons are not reliable for severity level comparisons
+        # because they're based on alphabetical order, not severity level
+        
+        # For proper comparisons, use indices or custom ordering logic
+        severity_order = {
+            SeverityLevel.LOW: 0,
+            SeverityLevel.MEDIUM: 1, 
+            SeverityLevel.HIGH: 2,
+            SeverityLevel.CRITICAL: 3
+        }
+        
+        # Test ordering using the dictionary values
+        self.assertTrue(severity_order[SeverityLevel.LOW] < severity_order[SeverityLevel.MEDIUM])
+        self.assertTrue(severity_order[SeverityLevel.MEDIUM] < severity_order[SeverityLevel.HIGH])
+        self.assertTrue(severity_order[SeverityLevel.HIGH] < severity_order[SeverityLevel.CRITICAL])
+        
+        # Test type
+        self.assertIsInstance(SeverityLevel.LOW, SeverityLevel)
+        self.assertIsInstance(SeverityLevel.LOW.value, str)
+    
     def test_category_severity(self):
         """Test the CategorySeverity model."""
-        severity = CategorySeverity(level="high", score=0.9, description="Very severe content")
-        self.assertEqual(severity.level, "high")
+        # Test with enum
+        severity = CategorySeverity(level=SeverityLevel.HIGH, score=0.9, description="Very severe content")
+        self.assertEqual(severity.level, SeverityLevel.HIGH)
         self.assertEqual(severity.score, 0.9)
         self.assertEqual(severity.description, "Very severe content")
         
+        # Test with string value
+        severity_from_str = CategorySeverity(level="HIGH", score=0.9)
+        self.assertEqual(severity_from_str.level, SeverityLevel.HIGH)
+        
+        # Test name property
+        self.assertEqual(severity.name, "HIGH")
+        
         # Test default values
-        default_severity = CategorySeverity(level="medium")
-        self.assertEqual(default_severity.level, "medium")
+        default_severity = CategorySeverity() 
+        self.assertEqual(default_severity.level, SeverityLevel.MEDIUM)
         self.assertEqual(default_severity.score, 0.0)
         self.assertEqual(default_severity.description, "")
+        
+        # Test with invalid enum value
+        with self.assertRaises(ValueError):
+            CategorySeverity(level="INVALID_LEVEL")
     
     def test_prompt_scan_result(self):
         """Test the PromptScanResult model."""
@@ -124,10 +165,11 @@ class TestModels(unittest.TestCase):
         )
         self.assertTrue(safe_result.is_safe)
         self.assertIsNone(safe_result.category)
+        self.assertIsNone(safe_result.severity)  # Safe result should have no severity
         self.assertEqual(safe_result.reasoning, "Content is safe")
         self.assertEqual(safe_result.token_usage, {"prompt_tokens": 50, "completion_tokens": 25})
         
-        # Test unsafe result with a category
+        # Test unsafe result with a category but no explicit severity
         category = PromptCategory(id="illegal_activity", name="Illegal Activity", confidence=0.9)
         unsafe_result = PromptScanResult(
             is_safe=False,
@@ -139,10 +181,33 @@ class TestModels(unittest.TestCase):
         self.assertEqual(unsafe_result.category.id, "illegal_activity")
         self.assertEqual(unsafe_result.reasoning, "Content promotes illegal activities")
         
+        # Test that default severity was added (validator)
+        self.assertIsNotNone(unsafe_result.severity)
+        self.assertEqual(unsafe_result.severity.level, SeverityLevel.HIGH)
+        
+        # Test unsafe result with explicit severity
+        custom_severity = CategorySeverity(
+            level=SeverityLevel.CRITICAL,
+            score=0.95,
+            description="Critical security issue"
+        )
+        unsafe_with_severity = PromptScanResult(
+            is_safe=False,
+            category=category,
+            severity=custom_severity,
+            reasoning="Content promotes serious illegal activities",
+            token_usage={"prompt_tokens": 70, "completion_tokens": 35}
+        )
+        self.assertEqual(unsafe_with_severity.severity.level, SeverityLevel.CRITICAL)
+        self.assertEqual(unsafe_with_severity.severity.score, 0.95)
+        self.assertEqual(unsafe_with_severity.severity.description, "Critical security issue")
+        
         # Test string representation
         self.assertIn("SAFE", str(safe_result))
         self.assertIn("UNSAFE", str(unsafe_result))
         self.assertIn("Illegal Activity", str(unsafe_result))
+        self.assertIn("HIGH", str(unsafe_result))  # Should include severity
+        self.assertIn("CRITICAL", str(unsafe_with_severity))  # Should include custom severity
         
         # Test to_dict method
         safe_dict = safe_result.to_dict()
@@ -154,6 +219,15 @@ class TestModels(unittest.TestCase):
         self.assertFalse(unsafe_dict["is_safe"])
         self.assertEqual(unsafe_dict["reasoning"], "Content promotes illegal activities")
         self.assertEqual(unsafe_dict["primary_category"]["id"], "illegal_activity")
+        
+        # Test that severity is included in the dictionary
+        self.assertIn("severity", unsafe_dict)
+        self.assertEqual(unsafe_dict["severity"]["level"], "HIGH")
+        
+        # Test severity in to_dict with custom severity
+        unsafe_custom_dict = unsafe_with_severity.to_dict()
+        self.assertEqual(unsafe_custom_dict["severity"]["level"], "CRITICAL")
+        self.assertEqual(unsafe_custom_dict["severity"]["description"], "Critical security issue")
     
     def test_prompt_scan_result_with_multiple_categories(self):
         """Test PromptScanResult with multiple categories."""

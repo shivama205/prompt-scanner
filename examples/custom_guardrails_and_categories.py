@@ -223,6 +223,24 @@ print(f"Result as dictionary: {result.to_dict()}")
 
 # Example of severity level comparison
 print("\n=== Severity Level Comparison ===")
-print(f"LOW < MEDIUM: {SeverityLevel.LOW.value < SeverityLevel.MEDIUM.value}")
-print(f"MEDIUM < HIGH: {SeverityLevel.MEDIUM.value < SeverityLevel.HIGH.value}")
-print(f"HIGH < CRITICAL: {SeverityLevel.HIGH.value < SeverityLevel.CRITICAL.value}") 
+# Create a helper function for severity comparison
+def compare_severity(level1, level2):
+    severity_order = {
+        SeverityLevel.LOW: 0,
+        SeverityLevel.MEDIUM: 1,
+        SeverityLevel.HIGH: 2,
+        SeverityLevel.CRITICAL: 3
+    }
+    return severity_order[level1] < severity_order[level2]
+
+# Use the helper function to compare severity levels
+print(f"LOW < MEDIUM: {compare_severity(SeverityLevel.LOW, SeverityLevel.MEDIUM)}")
+print(f"MEDIUM < HIGH: {compare_severity(SeverityLevel.MEDIUM, SeverityLevel.HIGH)}")
+print(f"HIGH < CRITICAL: {compare_severity(SeverityLevel.HIGH, SeverityLevel.CRITICAL)}")
+print(f"CRITICAL < LOW: {compare_severity(SeverityLevel.CRITICAL, SeverityLevel.LOW)}")
+
+# Direct string comparison (alphabetical) - NOT RELIABLE for severity comparison
+print(f"\nString value comparison (unreliable for severity):")
+print(f"LOW.value < MEDIUM.value: {SeverityLevel.LOW.value < SeverityLevel.MEDIUM.value}")  # True (alphabetical)
+print(f"MEDIUM.value < HIGH.value: {SeverityLevel.MEDIUM.value < SeverityLevel.HIGH.value}")  # True (alphabetical)
+print(f"HIGH.value < CRITICAL.value: {SeverityLevel.HIGH.value < SeverityLevel.CRITICAL.value}")  # False (alphabetical) 
