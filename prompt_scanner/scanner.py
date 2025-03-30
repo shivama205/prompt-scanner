@@ -48,6 +48,10 @@ class BasePromptScanner(ABC):
         self.injection_patterns = self._load_yaml_data("injection_patterns.yaml")
         self.content_policies = self._load_yaml_data("content_policies.yaml")
         
+        # Custom user-defined guardrails and categories
+        self.custom_guardrails = {}
+        self.custom_categories = {}
+        
         # Compile regex patterns for better performance
         self._compile_patterns()
         
@@ -209,11 +213,79 @@ class BasePromptScanner(ABC):
         """Alias for scan_text for backward compatibility."""
         return self.scan_text(text)
     
+    def add_custom_guardrail(self, name: str, guardrail_data: Dict[str, Any]) -> None:
+        """
+        Add a custom guardrail definition.
+        
+        Args:
+            name: Name/identifier for the guardrail
+            guardrail_data: Dictionary containing guardrail configuration
+        """
+        self.custom_guardrails[name] = guardrail_data
+        # Recompile patterns if needed
+        if "patterns" in guardrail_data:
+            for pattern in guardrail_data.get("patterns", []):
+                if pattern.get("type") == "regex" and pattern.get("value"):
+                    try:
+                        pattern["compiled_regex"] = re.compile(pattern["value"], re.IGNORECASE)
+                    except re.error:
+                        # If regex is invalid, create a fallback pattern
+                        pattern["compiled_regex"] = re.compile(re.escape(pattern["value"]), re.IGNORECASE)
+    
+    def remove_custom_guardrail(self, name: str) -> bool:
+        """
+        Remove a custom guardrail definition.
+        
+        Args:
+            name: Name/identifier of the guardrail to remove
+            
+        Returns:
+            bool: True if removed, False if not found
+        """
+        if name in self.custom_guardrails:
+            del self.custom_guardrails[name]
+            return True
+        return False
+        
+    def add_custom_category(self, category_id: str, category_data: Dict[str, Any]) -> None:
+        """
+        Add a custom content policy category.
+        
+        Args:
+            category_id: ID for the category
+            category_data: Dictionary containing category configuration
+        """
+        if "policies" not in self.custom_categories:
+            self.custom_categories["policies"] = {}
+        
+        self.custom_categories["policies"][category_id] = category_data
+    
+    def remove_custom_category(self, category_id: str) -> bool:
+        """
+        Remove a custom content policy category.
+        
+        Args:
+            category_id: ID of the category to remove
+            
+        Returns:
+            bool: True if removed, False if not found
+        """
+        if "policies" in self.custom_categories and category_id in self.custom_categories["policies"]:
+            del self.custom_categories["policies"][category_id]
+            return True
+        return False
+    
     def _format_categories_for_prompt(self) -> str:
         """Format content policy categories for inclusion in the prompt."""
         formatted = "Content Policy Categories:\n"
+        # Add built-in categories
         if "policies" in self.content_policies:
             for id, policy in self.content_policies["policies"].items():
+                formatted += f"{id}. {policy['name']}: {policy['description']}\n"
+        
+        # Add custom categories
+        if "policies" in self.custom_categories:
+            for id, policy in self.custom_categories["policies"].items():
                 formatted += f"{id}. {policy['name']}: {policy['description']}\n"
                 
                 # If examples are available, include one as a reasoning example
@@ -273,7 +345,7 @@ class BasePromptScanner(ABC):
                     "severity": pattern.get("severity", "medium")
                 })
         
-        # Apply guardrails
+        # Apply built-in guardrails
         for guardrail_name, guardrail in self.guardrails.items():
             if not self._check_guardrail(content, guardrail):
                 issues.append({
@@ -282,6 +354,18 @@ class BasePromptScanner(ABC):
                     "message_index": index,
                     "description": guardrail.get("description", "Guardrail violation detected"),
                     "severity": "high"
+                })
+        
+        # Apply custom guardrails
+        for guardrail_name, guardrail in self.custom_guardrails.items():
+            if not self._check_guardrail(content, guardrail):
+                issues.append({
+                    "type": "guardrail_violation",
+                    "guardrail": guardrail_name,
+                    "message_index": index,
+                    "description": guardrail.get("description", "Custom guardrail violation detected"),
+                    "severity": "high",
+                    "custom": True
                 })
         
         # Run LLM-based content safety check
@@ -312,8 +396,23 @@ class BasePromptScanner(ABC):
             # Check for PII patterns
             for pattern in guardrail.get("patterns", []):
                 if pattern.get("type") == "regex" and pattern.get("value"):
-                    if re.search(pattern["value"], content, re.IGNORECASE):
-                        return False
+                    if "compiled_regex" in pattern:
+                        if pattern["compiled_regex"].search(content):
+                            return False
+                    else:
+                        if re.search(pattern["value"], content, re.IGNORECASE):
+                            return False
+        
+        # Check for other guardrail types
+        if guardrail_type == "format" and "formats" in guardrail:
+            # This would implement format validation logic
+            pass
+        
+        if guardrail_type == "limit" and "max_tokens" in guardrail:
+            # Check if content exceeds token limit
+            token_count = self._count_tokens(content)
+            if token_count > guardrail.get("max_tokens", 4096):
+                return False
         
         # For now, other guardrail types pass by default
         # This would be expanded in a full implementation
@@ -323,20 +422,25 @@ class BasePromptScanner(ABC):
 class OpenAIPromptScanner(BasePromptScanner):
     """Implementation of PromptScanner for OpenAI."""
     
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
+    def __init__(self, api_key: str, model: str = "gpt-4o", base_url: Optional[str] = None):
         """
         Initialize OpenAI-specific prompt scanner.
         
         Args:
             api_key: OpenAI API key
             model: OpenAI model name to use (default: gpt-4o)
+            base_url: Optional custom OpenAI API base URL
         """
+        self.base_url = base_url
         super().__init__(api_key, model)
         self._setup_client()
     
     def _setup_client(self):
         """Setup OpenAI client."""
-        self.client = OpenAI(api_key=self.api_key)
+        if hasattr(self, 'base_url') and self.base_url:
+            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        else:
+            self.client = OpenAI(api_key=self.api_key)
     
     def _validate_prompt_structure(self, prompt: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate OpenAI prompt structure."""
@@ -539,7 +643,7 @@ class AnthropicPromptScanner(BasePromptScanner):
         
         return issues
     
-    def _create_evaluation_prompt(self, text: str) -> str:
+    def _create_evaluation_prompt(self, text: str) -> List[Dict[str, str]]:
         """Create the prompt for Anthropic content evaluation."""
         categories_info = self._format_categories_for_prompt()
         examples_info = self._format_examples_for_prompt()
@@ -576,23 +680,15 @@ If the content is safe, return is_safe as true and an empty categories array, bu
 If the content violates multiple categories, list them all in the categories array with their respective confidence levels.
 """
         
-        return f"""
-{instructions}
-
-{categories_info}
-
-{examples_info}
-
-Input to evaluate: {text}
-
-JSON response:
-"""
+        return [
+            {"role": "user", "content": f"{instructions}\n\n{categories_info}\n\n{examples_info}\n\nInput to evaluate: {text}\n\nJSON response:"}
+        ]
     
     def _call_content_evaluation(self, prompt, text) -> tuple:
         """Call Anthropic to evaluate content."""
         response = self.client.messages.create(
             model=self.model,  # Use the specified model
-            messages=[{"role": "user", "content": prompt}],
+            messages=prompt,
             max_tokens=1024
         )
         
@@ -611,45 +707,42 @@ JSON response:
 
 class PromptScanner:
     """
-    A class to scan prompts for potential safety issues, injection attacks, and apply guardrails before
-    sending to language models like OpenAI and Anthropic. Uses LLM-based content safety checking.
-    
-    Factory class that creates appropriate provider-specific scanners.
+    Main facade class for prompt scanning functionality.
+    Allows selection of provider-specific implementations.
     """
     
     def __init__(self, provider: Literal["openai", "anthropic"] = "openai", api_key: Optional[str] = None, model: Optional[str] = None):
         """
-        Initialize the PromptScanner with an LLM provider, API key, and model.
+        Initialize the PromptScanner with the chosen provider.
         
         Args:
-            provider: The LLM provider (default: "openai")
-            api_key: API key for the specified provider (if None, will use environment variable)
-            model: Model name to use (if None, will use provider-specific default)
+            provider: The LLM provider to use ("openai" or "anthropic")
+            api_key: API key for the provider, if None will look in environment variables
+            model: Model name to use for content evaluation
         """
-        self.provider = provider
-        
         # Get API key from environment if not provided
         if api_key is None:
             if provider == "openai":
                 api_key = os.environ.get("OPENAI_API_KEY")
-                if not api_key:
-                    raise ValueError("No OpenAI API key provided and none found in environment variables")
-            else:  # anthropic
+            else:
                 api_key = os.environ.get("ANTHROPIC_API_KEY")
-                if not api_key:
-                    raise ValueError("No Anthropic API key provided and none found in environment variables")
+                
+        if not api_key:
+            raise ValueError(f"API key for {provider} must be provided or set in environment variables")
         
-        # Create provider-specific scanner
+        # Create scanner based on provider
         if provider == "openai":
-            model = model or "gpt-4o"
-            self._scanner = OpenAIPromptScanner(api_key=api_key, model=model)
+            if model is None:
+                model = "gpt-4o"
+            self.scanner = OpenAIPromptScanner(api_key=api_key, model=model)
         elif provider == "anthropic":
-            model = model or "claude-3-haiku-20240307"
-            self._scanner = AnthropicPromptScanner(api_key=api_key, model=model)
+            if model is None:
+                model = "claude-3-haiku-20240307"
+            self.scanner = AnthropicPromptScanner(api_key=api_key, model=model)
         else:
-            raise ValueError(f"Unsupported provider: {provider}. Use 'openai' or 'anthropic'")
-            
-        # Initialize the decorators attribute
+            raise ValueError(f"Unsupported provider: {provider}")
+        
+        # Set up decorator methods
         self.decorators = self._init_decorators()
     
     def _init_decorators(self):
@@ -687,7 +780,7 @@ class PromptScanner:
         Returns:
             ScanResult: Object containing scan results and issues
         """
-        return self._scanner.scan(prompt)
+        return self.scanner.scan(prompt)
     
     def scan_text(self, text: str) -> PromptScanResult:
         """
@@ -699,8 +792,52 @@ class PromptScanner:
         Returns:
             PromptScanResult: Object containing content safety scan results
         """
-        return self._scanner.scan_text(text)
+        return self.scanner.scan_text(text)
     
     def scan_content(self, text: str) -> PromptScanResult:
         """Alias for scan_text for backward compatibility."""
-        return self.scan_text(text) 
+        return self.scan_text(text)
+    
+    def add_custom_guardrail(self, name: str, guardrail_data: Dict[str, Any]) -> None:
+        """
+        Add a custom guardrail definition.
+        
+        Args:
+            name: Name/identifier for the guardrail
+            guardrail_data: Dictionary containing guardrail configuration
+        """
+        self.scanner.add_custom_guardrail(name, guardrail_data)
+    
+    def remove_custom_guardrail(self, name: str) -> bool:
+        """
+        Remove a custom guardrail definition.
+        
+        Args:
+            name: Name/identifier of the guardrail to remove
+            
+        Returns:
+            bool: True if removed, False if not found
+        """
+        return self.scanner.remove_custom_guardrail(name)
+        
+    def add_custom_category(self, category_id: str, category_data: Dict[str, Any]) -> None:
+        """
+        Add a custom content policy category.
+        
+        Args:
+            category_id: ID for the category
+            category_data: Dictionary containing category configuration
+        """
+        self.scanner.add_custom_category(category_id, category_data)
+    
+    def remove_custom_category(self, category_id: str) -> bool:
+        """
+        Remove a custom content policy category.
+        
+        Args:
+            category_id: ID of the category to remove
+            
+        Returns:
+            bool: True if removed, False if not found
+        """
+        return self.scanner.remove_custom_category(category_id) 

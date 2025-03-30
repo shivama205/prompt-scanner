@@ -127,4 +127,21 @@ class PromptScanResult(BaseModel):
             self.all_categories, 
             key=lambda x: x.get("confidence", 0), 
             reverse=True
-        )[:max_count] 
+        )[:max_count]
+
+class CustomGuardrail(BaseModel):
+    """Model representing a custom user-defined guardrail"""
+    name: str
+    type: str  # Examples: "moderation", "privacy", "format", "limit"
+    description: str
+    patterns: List[Dict[str, Any]] = Field(default_factory=list)
+    threshold: Optional[float] = None
+    max_tokens: Optional[int] = None
+    formats: Optional[List[str]] = None
+
+class CustomCategory(BaseModel):
+    """Model representing a custom user-defined content policy category"""
+    id: str
+    name: str
+    description: str
+    examples: List[str] = Field(default_factory=list) 
