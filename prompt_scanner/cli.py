@@ -3,6 +3,7 @@ import argparse
 import json
 import sys
 import os
+import logging
 from typing import Optional, Dict, Any
 
 from prompt_scanner import PromptScanner, PromptScanResult, __version__
@@ -118,41 +119,38 @@ def load_guardrails(guardrail_file: str) -> Dict[str, Any]:
         with open(guardrail_file, 'r') as f:
             guardrails = json.load(f)
             if not isinstance(guardrails, dict):
-                print(f"Error: Guardrails file should contain a JSON object", file=sys.stderr)
+                logging.getLogger(__name__).error(f"Guardrails file should contain a JSON object")
                 sys.exit(1)
             return guardrails
     except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON in guardrails file: {e}", file=sys.stderr)
+        logging.getLogger(__name__).error(f"Invalid JSON in guardrails file: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"Error loading guardrails file: {e}", file=sys.stderr)
+        logging.getLogger(__name__).error(f"Error loading guardrails file: {e}")
         sys.exit(1)
 
 
-def get_input_text(args: argparse.Namespace, verbose: int) -> str:
+def get_input_text(args: argparse.Namespace) -> str:
     """Get the input text from the specified source."""
+    logger = logging.getLogger(__name__)
+    
     if args.text:
-        if verbose >= 1:
-            print(f"Input: Direct text input ({len(args.text)} characters)", file=sys.stderr)
+        logger.info(f"Input: Direct text input ({len(args.text)} characters)")
         return args.text
     elif args.file:
         try:
-            if verbose >= 1:
-                print(f"Input: Reading from file '{args.file}'", file=sys.stderr)
+            logger.info(f"Input: Reading from file '{args.file}'")
             with open(args.file, 'r') as f:
                 content = f.read()
-                if verbose >= 1:
-                    print(f"Read {len(content)} characters from file", file=sys.stderr)
+                logger.info(f"Read {len(content)} characters from file")
                 return content
         except Exception as e:
-            print(f"Error reading input file: {e}", file=sys.stderr)
+            logger.error(f"Error reading input file: {e}")
             sys.exit(1)
     elif args.stdin:
-        if verbose >= 1:
-            print(f"Input: Reading from standard input", file=sys.stderr)
+        logger.info(f"Input: Reading from standard input")
         content = sys.stdin.read()
-        if verbose >= 1:
-            print(f"Read {len(content)} characters from stdin", file=sys.stderr)
+        logger.info(f"Read {len(content)} characters from stdin")
         return content
     
     return ""  # This should never happen due to the mutually exclusive group
@@ -224,90 +222,95 @@ def format_result(result: PromptScanResult, format_type: str, verbose: int, use_
         return "\n".join(output)
 
 
-def setup_api_keys(args: argparse.Namespace, verbose: int) -> None:
+def setup_api_keys(args: argparse.Namespace) -> None:
     """Set up API keys from args or check if they're in environment."""
+    logger = logging.getLogger(__name__)
+
     # Set API keys from command line if provided
     if args.openai_api_key:
         os.environ["OPENAI_API_KEY"] = args.openai_api_key
-        if verbose >= 1:
-            print("Using OpenAI API key from command line", file=sys.stderr)
+        logger.info("Using OpenAI API key from command line")
     
     if args.anthropic_api_key:
         os.environ["ANTHROPIC_API_KEY"] = args.anthropic_api_key
-        if verbose >= 1:
-            print("Using Anthropic API key from command line", file=sys.stderr)
+        logger.info("Using Anthropic API key from command line")
     
     # Check if required API key is in environment
     provider = args.provider.lower()
     if provider == "openai" and "OPENAI_API_KEY" not in os.environ:
-        print("Error: OpenAI API key not found. Set OPENAI_API_KEY environment variable or use --openai-api-key", 
-              file=sys.stderr)
+        logger.error("OpenAI API key not found. Set OPENAI_API_KEY environment variable or use --openai-api-key")
         sys.exit(1)
     elif provider == "anthropic" and "ANTHROPIC_API_KEY" not in os.environ:
-        print("Error: Anthropic API key not found. Set ANTHROPIC_API_KEY environment variable or use --anthropic-api-key", 
-              file=sys.stderr)
+        logger.error("Anthropic API key not found. Set ANTHROPIC_API_KEY environment variable or use --anthropic-api-key")
         sys.exit(1)
 
 
 def main():
-    args = parse_args()
-    verbose = args.verbose
-    
-    # Set up API keys
-    setup_api_keys(args, verbose)
-    
-    # Initialize scanner with specified provider and model
-    scanner_kwargs = {"provider": args.provider.lower()}
-    
-    if args.model:
-        scanner_kwargs["model"] = args.model
-        if verbose >= 1:
-            print(f"Using model: {args.model}", file=sys.stderr)
-    
-    if verbose >= 1:
-        print(f"Using provider: {args.provider}", file=sys.stderr)
-    
+    # Load environment variables from .env file if it exists
     try:
-        scanner = PromptScanner(**scanner_kwargs)
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        # dotenv is optional, proceed without it if not installed
+        pass 
         
-        # Load custom guardrails if specified
-        if args.guardrail_file:
-            if verbose >= 1:
-                print(f"Loading custom guardrails from {args.guardrail_file}", file=sys.stderr)
-            guardrails = load_guardrails(args.guardrail_file)
-            for name, guardrail in guardrails.items():
-                if verbose >= 1:
-                    print(f"Adding custom guardrail: {name}", file=sys.stderr)
-                scanner.add_custom_guardrail(name, guardrail)
+    args = parse_args()
+
+    # Configure logging
+    log_level = logging.ERROR
+    if args.verbose >= 1:
+        log_level = logging.INFO
+    # Simple format: LEVEL: message
+    logging.basicConfig(level=log_level, format='%(levelname)s: %(message)s', stream=sys.stderr)
+    logger = logging.getLogger(__name__) # Get logger instance
+
+    # Pass args directly instead of verbose level
+    setup_api_keys(args) 
+    content = get_input_text(args) 
+
+    # Determine model based on provider if not specified
+    model = args.model
+    if not model:
+        if args.provider == "openai":
+            model = "gpt-4o" # Default OpenAI model
+        elif args.provider == "anthropic":
+            model = "claude-3-opus-20240229" # Default Anthropic model
+    # Replace conditional print with logger.info
+    logger.info(f"Using model: {model}")
+    # Replace conditional print with logger.info
+    logger.info(f"Using provider: {args.provider}")
+
+    custom_guardrails = {}
+    if args.guardrail_file:
+        # Replace conditional print with logger.info
+        logger.info(f"Loading custom guardrails from {args.guardrail_file}")
+        custom_guardrails = load_guardrails(args.guardrail_file)
+        for name in custom_guardrails.keys():
+             # Replace conditional print with logger.info
+            logger.info(f"Adding custom guardrail: {name}")
+
+    try:
+        scanner = PromptScanner(provider=args.provider, model=model)
+        for name, definition in custom_guardrails.items():
+            scanner.add_guardrail(name, definition)
         
-        # Get input text
-        input_text = get_input_text(args, verbose)
+        # Replace conditional print with logger.info
+        logger.info("Scanning content...")
+        result = scanner.scan(content)
         
-        if verbose >= 1:
-            print("Scanning content...", file=sys.stderr)
-        
-        # Scan the input
-        try:
-            result = scanner.scan_text(input_text)
-        except Exception as e:
-            print(f"Error during content scanning: {e}", file=sys.stderr)
-            sys.exit(1)
-        
-        # Format and display the result
-        output = format_result(result, args.format, verbose, args.color)
-        print(output)
-        
-        # Exit with status code 1 if unsafe content was detected
-        if not result.is_safe:
-            sys.exit(1)
-    
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        if verbose >= 2:
-            import traceback
-            traceback.print_exc()
+        # Replace print with logger.error
+        logger.error(f"Error during content scanning: {e}")
         sys.exit(1)
+
+    output = format_result(result, args.format, args.verbose, args.color)
+    print(output) # Keep this print for stdout result
 
 
 if __name__ == "__main__":
-    main() 
+    try:
+        main()
+    except Exception as e:
+        # General error catcher, replace print with logger.critical or logger.error
+        logging.getLogger(__name__).critical(f"An unexpected error occurred: {e}") # Use logger here too
+        sys.exit(1) 
